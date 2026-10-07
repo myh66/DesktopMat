@@ -1,0 +1,35 @@
+name: Native macOS build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-macos-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      CLANG_MODULE_CACHE_PATH: ${{ github.workspace }}/.build/ModuleCache
+      SWIFT_MODULECACHE_PATH: ${{ github.workspace }}/.build/ModuleCache
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Inspect toolchain
+        run: swift --version
+      - name: Test cloth engine
+        run: swift test -c release --scratch-path "$GITHUB_WORKSPACE/.build" --disable-sandbox
+      - name: Package native application
+        run: bash scripts/build-app.sh release
+      # GUI verification requires an interactive local desktop session.
+      # This build is ad-hoc signed, not a notarized release.

@@ -35,6 +35,10 @@ The app uses a deformable cloth mesh, rather than dragging or rotating a flat im
 
 These are original procedural interpretations of textile motifs. Version 0.3 passes a local Release build, 8 engine tests and 19 runtime checks, with native gallery selection verified. The selected theme currently applies to all displays; per-display themes and placement persistence are planned.
 
+切换主题会保留当前布料的形状与位置；重新启动会恢复上次选择的主题。
+
+Changing a theme preserves the current cloth shape and position. Restarting restores your last selected theme.
+
 ## 构建与运行 / Build and run
 
 需要 macOS 15+ 和包含 Swift 6 的 Xcode 或 Command Line Tools；没有第三方包依赖。

@@ -15,7 +15,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.workflow }}-${{ github.ref }}
+  group: release-${{ inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -27,25 +27,24 @@ jobs:
       SWIFT_MODULECACHE_PATH: ${{ github.workspace }}/.build/ModuleCache
     steps:
       - name: Check out source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
-          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Resolve release metadata
         id: meta
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
         run: |
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
-          if [[ -z "$TAG" ]]; then
-            echo "Release tag is required" >&2
+          TAG="${TAG_INPUT:-$GITHUB_REF_NAME}"
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)
+          if [[ "$TAG" != "v$VERSION" ]]; then
+            echo "Release tag must match the application version v$VERSION" >&2
             exit 1
           fi
+          test -f "docs/releases/$TAG.md"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "zip_name=DesktopMat-${TAG}-macOS.zip" >> "$GITHUB_OUTPUT"
 
       - name: Inspect toolchain
         run: swift --version
@@ -53,26 +52,27 @@ jobs:
       - name: Run tests
         run: swift test -c release --scratch-path "$GITHUB_WORKSPACE/.build" --disable-sandbox
 
-      - name: Build native app bundle
-        run: bash scripts/build-app.sh release
+      - name: Build and verify universal packages
+        run: bash scripts/package-release.sh
 
-      - name: Package release artifact
+      - name: Upload verified packages to a draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
         run: |
-          APP_PATH="$GITHUB_WORKSPACE/build/一席 · Desktop Mat.app"
-          ZIP_PATH="$GITHUB_WORKSPACE/build/${{ steps.meta.outputs.zip_name }}"
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_PATH"
-
-      - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.meta.outputs.zip_name }}
-          path: build/${{ steps.meta.outputs.zip_name }}
-          if-no-files-found: error
-
-      - name: Publish GitHub release asset
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          generate_release_notes: true
-          files: |
-            build/${{ steps.meta.outputs.zip_name }}
+          PACKAGES="$GITHUB_WORKSPACE/build/releases/$RELEASE_TAG"
+          NOTES="$GITHUB_WORKSPACE/docs/releases/$RELEASE_TAG.md"
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if [[ "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" != "true" ]]; then
+              echo "Release already published; create a new version tag instead of replacing public assets." >&2
+              exit 1
+            fi
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+              "$PACKAGES"/*.dmg "$PACKAGES"/*.zip "$PACKAGES/SHA256SUMS"
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --notes-file "$NOTES" --prerelease
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --draft --prerelease \
+              --title "$RELEASE_TAG · Developer Preview / 开发预览" --notes-file "$NOTES" \
+              "$PACKAGES"/*.dmg "$PACKAGES"/*.zip "$PACKAGES/SHA256SUMS"
+          fi
+          # Inspect the downloadable assets before publishing the first draft.

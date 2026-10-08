@@ -39,6 +39,12 @@ These are original procedural interpretations of textile motifs. Version 0.3 pas
 
 Changing a theme preserves the current cloth shape and position. Restarting restores your last selected theme.
 
+## 下载 / Download
+
+[v0.3.0 开发预览](https://github.com/myh66/DesktopMat/releases/tag/v0.3.0)提供 macOS 15+ Universal DMG 与 ZIP，包含 Apple Silicon 和 Intel 架构。打开 DMG，将应用拖入 Applications；旧版运行时先从菜单栏退出，再打开新版。应用使用 ad-hoc 开发签名、尚未公证，首次打开与已知限制见下载页。
+
+Download the [v0.3.0 developer preview](https://github.com/myh66/DesktopMat/releases/tag/v0.3.0) for macOS 15+, with arm64 and x86_64 in one Universal package. Drag the app to Applications and quit the old version before launching. This preview is ad-hoc signed and not notarized; see the release notes for first-launch guidance and limitations.
+
 ## 构建与运行 / Build and run
 
 需要 macOS 15+ 和包含 Swift 6 的 Xcode 或 Command Line Tools；没有第三方包依赖。
@@ -57,6 +63,16 @@ open "build/一席 · Desktop Mat.app"
 ```
 
 Build the app locally with the command above, then use its menu bar item. The build script packages resources and applies an ad-hoc development signature. This is **not a notarized distribution or an App Store build**.
+
+生成通用发行包（需要完整 Xcode）/ Build Universal distribution packages (requires full Xcode):
+
+```sh
+bash scripts/package-release.sh
+```
+
+DMG、ZIP 与 SHA256SUMS 输出到 `build/releases/v<version>/`。推送与 Info.plist 版本一致的 `v<version>` tag 后，发行工作流测试并构建通用包，上传为草稿；核对资产后在 GitHub 发布。
+
+The tag-driven release workflow tests and builds the Universal packages, then uploads a draft. Inspect the assets before publishing it on GitHub.
 
 ## 非破坏性 / Non-destructive by design
 
